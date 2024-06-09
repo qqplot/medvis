@@ -79,6 +79,7 @@ toc: false
   }</div>
 </div>
 
+
 ```js
 const aapl = FileAttachment("aapl.csv").csv({typed: true});
 const penguins = FileAttachment("penguins.csv").csv({typed: true});
