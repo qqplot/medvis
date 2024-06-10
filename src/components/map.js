@@ -1,113 +1,126 @@
-import {require} from "npm:d3-require";
-const d3 = await require("d3@6");
+import * as Plot from "npm:@observablehq/plot";
+import {format} from "npm:d3";
 
-// The svg
-const svg = d3.select("svg"),
-    width = +svg.attr("width"),
-    height = +svg.attr("height");
+// Colors and scale
+const colorGenerating = "#88DCAD";
+const colorUnavailable = "gray";
+const color = Plot.scale({
+  color: {
+    type: "linear",
+    domain: [-1, -0.1501, -0.15, 0, 0.15, 0.1501, 1],
+    range: ["#145a95", "#145a95", "steelblue", "white", "orange", "darkorange", "darkorange"]
+  }
+});
 
-// Map and projection
-const projection = d3.geoMercator()
-    .center([0,20])                // GPS of location to zoom on
-    .scale(99)                       // This is like the zoom
-    .translate([ width/2, height/2 ])
+// US map
+export function balancingAuthoritiesMap({
+  baHourlyChange,
+  baHourlyLatest,
+  eiaPoints,
+  nation,
+  statemesh,
+  width
+}) {
+  return Plot.plot({
+    width,
+    height: width * 0.6,
+    color: {
+      ...color,
+      transform: (d) => d / 100,
+      label: "Change in demand (%) from previous hour"
+    },
+    // projection: {
+    //   type: "albers",
+    //   insetTop: 15
+    // },
+    r: {
+      range: [4, 30]
+    },
+    marks: [
+      Plot.geo(nation, {fill: "currentColor", fillOpacity: 0.1, stroke: "var(--theme-background-alt)"}),
+      // Plot.geo(statemesh, {stroke: "var(--theme-background-alt)", strokeWidth: 0.8}),
+      // Plot.dot(eiaPoints, {
+      //   filter: (d) => isNaN(baHourlyChange.get(d.name)) && !(d.region_id === "MEX" || d.region_id === "CAN"),
+      //   x: "lon",
+      //   y: "lat",
+      //   r: "radius",
+      //   stroke: "gray",
+      //   strokeWidth: 1,
+      //   fill: "#6D6D6D"
+      // }),
+      // Plot.dot(eiaPoints, {
+      //   filter: (d) => genOnlyBA.includes(d.id),
+      //   x: "lon",
+      //   y: "lat",
+      //   r: "radius",
+      //   fill: colorGenerating,
+      //   stroke: "gray",
+      //   strokeWidth: 1
+      // }),
+      Plot.dot(eiaPoints, {
+        // filter: (d) => !isNaN(baHourlyChange.get(d.name)),
+        x: "longitude",
+        y: "latitude",
+        r: 3,
+        fill: (d) => baHourlyChange.get(d.country)
+      }),
+      // Plot.text(covid, {
+      //   x: "longitude",
+      //   y: "latitude",
+      //   // text: (d) => (d.radius > 10000 ? d.id : null),
+      //   // text: (d) => (d.id),
+      //   // fontWeight: 800,
+      //   fill: "black"
+      // }),
+      // Plot.tip(
+      //   eiaPoints,
+      //   Plot.pointer({
+      //     x: "lon",
+      //     y: "lat",
+      //     title: (d) =>
+      //       d.region_id === "MEX" || d.region_id === "CAN"
+      //         ? `${d.name} (${d.region_id})\nNo demand data.`
+      //         : `${d.name} (${d.id})\nChange from previous hour: ${
+      //             isNaN(baHourlyChange.get(d.name)) ? "Unavailable" : baHourlyChange.get(d.name).toFixed(1) + "%"
+      //           }\nLatest hourly demand: ${
+      //             isNaN(baHourlyLatest.get(d.name))
+      //               ? "Unavailable"
+      //               : (baHourlyLatest.get(d.name) / 1000).toFixed(2) + " GWh"
+      //           }`
+      //   })
+      // )
+    ]
+  });
+}
 
-Promise.all([
-d3.json("https://raw.githubusercontent.com/holtzy/D3-graph-gallery/master/DATA/world.geojson"),
-d3.csv("https://raw.githubusercontent.com/holtzy/D3-graph-gallery/master/DATA/data_gpsLocSurfer.csv")
-]).then(function (initialize) {
-
-    let dataGeo = initialize[0]
-    let data = initialize[1]
-
-  // Create a color scale
-  const color = d3.scaleOrdinal()
-    .domain(data.map(d => d.homecontinent))
-    .range(d3.schemePaired);
-
-  // Add a scale for bubble size
-  const valueExtent = d3.extent(data, d => +d.n)
-  const size = d3.scaleSqrt()
-    .domain(valueExtent)  // What's in the data
-    .range([ 1, 50])  // Size in pixel
-
-  // Draw the map
-  svg.append("g")
-      .selectAll("path")
-      .data(dataGeo.features)
-      .join("path")
-        .attr("fill", "#b8b8b8")
-        .attr("d", d3.geoPath()
-            .projection(projection)
-        )
-      .style("stroke", "none")
-      .style("opacity", .3)
-
-  // Add circles:
-  svg
-    .selectAll("myCircles")
-    .data(data.sort((a,b) => +b.n - +a.n).filter((d,i) => i<1000))
-    .join("circle")
-      .attr("cx", d => projection([+d.homelon, +d.homelat])[0])
-      .attr("cy", d => projection([+d.homelon, +d.homelat])[1])
-      .attr("r", d => size(+d.n))
-      .style("fill", d => color(d.homecontinent))
-      .attr("stroke", d=> {if (d.n>2000) {return "black"} else {return "none"}  })
-      .attr("stroke-width", 1)
-      .attr("fill-opacity", .4)
-
-
-
-  // Add title and explanation
-  svg
-    .append("text")
-      .attr("text-anchor", "end")
-      .style("fill", "black")
-      .attr("x", width - 10)
-      .attr("y", height - 30)
-      .attr("width", 90)
-      .html("WHERE SURFERS LIVE")
-      .style("font-size", 14)
-
-
-  // --------------- //
-  // ADD LEGEND //
-  // --------------- //
-
-  // Add legend: circles
-  const valuesToShow = [100,4000,15000]
-  const xCircle = 40
-  const xLabel = 90
-  svg
-    .selectAll("legend")
-    .data(valuesToShow)
-    .join("circle")
-      .attr("cx", xCircle)
-      .attr("cy", d => height - size(d))
-      .attr("r", d => size(d))
-      .style("fill", "none")
-      .attr("stroke", "black")
-
-  // Add legend: segments
-  svg
-    .selectAll("legend")
-    .data(valuesToShow)
-    .join("line")
-      .attr('x1', d => xCircle + size(d))
-      .attr('x2', xLabel)
-      .attr('y1', d => height - size(d))
-      .attr('y2', d => height - size(d))
-      .attr('stroke', 'black')
-      .style('stroke-dasharray', ('2,2'))
-
-  // Add legend: labels
-  svg
-    .selectAll("legend")
-    .data(valuesToShow)
-    .join("text")
-      .attr('x', xLabel)
-      .attr('y', d => height - size(d))
-      .text(d => d)
-      .style("font-size", 10)
-      .attr('alignment-baseline', 'middle')
-})
+// Map legend
+export function balancingAuthoritiesLegend(width) {
+  return Plot.plot({
+    marginTop: 15,
+    width: Math.min(width - 30, 400),
+    height: 60,
+    y: {axis: null},
+    marks: [
+      Plot.raster({
+        y1: 0,
+        y2: 1,
+        x1: -0.09,
+        x2: 1.09,
+        fill: (x) => color.apply(x - 0.5)
+      }),
+      Plot.ruleX([0, 0.5, 1], {insetBottom: -5}),
+      Plot.axisX([0, 0.5, 1], {tickFormat: format("+.0%"), tickSize: 0}),
+      // Plot.dot(["Generating only", "Unavailable"], {
+      //   x: [0.23, 0.4],
+      //   r: 5,
+      //   dx: -8,
+      //   fill: [colorGenerating, colorUnavailable],
+      //   stroke: "grey"
+      // }),
+      // Plot.text(["Generating only", "Unavailable"], {
+      //   x: [0.23, 0.4],
+      //   textAnchor: "start"
+      // })
+    ]
+  });
+}
