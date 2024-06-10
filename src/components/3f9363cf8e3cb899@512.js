@@ -80,7 +80,7 @@ function _ui_config(){return(
     opacityHighlightDim: 0.1,
     opacitySelectDim: 0.3,
     opacityRegular: 0.8,
-    timeInBackground: true,
+    timeInBackground: false,
     timeInTrails: true,
     lockNonSelected: 0,
     numberFormatSIPrefix: true,
